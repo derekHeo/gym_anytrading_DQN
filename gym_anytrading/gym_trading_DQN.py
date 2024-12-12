@@ -1,3 +1,15 @@
+"""
+인공지능학과
+필수 설치 파일 안내드립니다.
+pip install gymnasium
+pip install stable-baselines3
+pip install matplotlib
+pip install torch torchvision
+pip install gym-anytrading
+pip install tensorboard
+pip install accelerate
+"""
+
 import os
 import time
 import gymnasium as gym
@@ -15,7 +27,7 @@ from stable_baselines3.common.results_plotter import ts2xy
 from stable_baselines3.common.policies import ActorCriticPolicy
 
 class CustomLSTMFeaturesExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space, features_dim=2):
+    def __init__(self, observation_space, features_dim=32):
         super(CustomLSTMFeaturesExtractor, self).__init__(observation_space, features_dim)
         n_input_features = observation_space.shape[1]
 
@@ -64,7 +76,7 @@ def train(env_id, df, log_base_dir="logs", model_base_dir="models", model_name="
 
     policy_kwargs = dict(
         features_extractor_class=CustomLSTMFeaturesExtractor,
-        features_extractor_kwargs=dict(features_dim=2)
+        features_extractor_kwargs=dict(features_dim=32)
     )
 
     model = DQN(
@@ -72,7 +84,7 @@ def train(env_id, df, log_base_dir="logs", model_base_dir="models", model_name="
         env=vec_env,
         learning_rate=0.001,
         buffer_size=100000,
-        learning_starts=1000,
+        learning_starts=2000,
         batch_size=128,
         tau=0.01,
         gamma=0.95,
@@ -89,7 +101,7 @@ def train(env_id, df, log_base_dir="logs", model_base_dir="models", model_name="
 
     callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_path)
     #여기서 timesteps 지정
-    model.learn(total_timesteps=200000, callback=callback)
+    model.learn(total_timesteps=10000, callback=callback)
 
     # 저장 save
     model_save_path = os.path.join(model_base_dir, model_name)
@@ -119,5 +131,5 @@ def test(env_id, df, model_base_dir="models", model_name="anytrading_dqn"):
 
 if __name__ == "__main__":
     env_id = "stocks-v0"
-    # train(env_id, STOCKS_GOOGL)
+    train(env_id, STOCKS_GOOGL)
     test(env_id, STOCKS_GOOGL)
