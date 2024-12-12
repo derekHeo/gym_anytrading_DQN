@@ -6,7 +6,6 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecMonitor
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-import torch as th
 from torch import nn
 import matplotlib.pyplot as plt
 from gym_anytrading.envs import Actions, Positions
@@ -15,9 +14,8 @@ from stable_baselines3.common.monitor import load_results
 from stable_baselines3.common.results_plotter import ts2xy
 from stable_baselines3.common.policies import ActorCriticPolicy
 
-# Custom feature extractor for LSTM
 class CustomLSTMFeaturesExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space, features_dim=128):
+    def __init__(self, observation_space, features_dim=2):
         super(CustomLSTMFeaturesExtractor, self).__init__(observation_space, features_dim)
         n_input_features = observation_space.shape[1]
 
@@ -32,7 +30,6 @@ class CustomLSTMFeaturesExtractor(BaseFeaturesExtractor):
         last_timestep = lstm_out[:, -1, :]
         return self.linear(last_timestep)
 
-# Callback to save the best model
 class SaveOnBestTrainingRewardCallback(BaseCallback):
     def __init__(self, check_freq, log_dir, verbose=1):
         super().__init__(verbose)
@@ -57,24 +54,19 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                         print(f"New best mean reward: {mean_reward}. Saving model to {self.save_path}")
         return True
 
-# Training function
 def train(env_id, df, log_base_dir="logs", model_base_dir="models", model_name="anytrading_dqn"):
     log_path = os.path.join(log_base_dir, model_name)
     os.makedirs(log_path, exist_ok=True)
 
-
-    # Create the environment
     env = gym.make(env_id, df=df, window_size=10, frame_bound=(10, 300))
     vec_env = make_vec_env(lambda: env, n_envs=1)
     vec_env = VecMonitor(vec_env, log_path)
 
-    # Define custom policy with LSTM feature extractor
     policy_kwargs = dict(
         features_extractor_class=CustomLSTMFeaturesExtractor,
-        features_extractor_kwargs=dict(features_dim=128)
+        features_extractor_kwargs=dict(features_dim=2)
     )
 
-    # Initialize the model
     model = DQN(
         policy="MlpPolicy",
         env=vec_env,
@@ -95,28 +87,24 @@ def train(env_id, df, log_base_dir="logs", model_base_dir="models", model_name="
         policy_kwargs=policy_kwargs
     )
 
-    # Train the model
     callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_path)
-    model.learn(total_timesteps=30000, callback=callback)
+    #여기서 timesteps 지정
+    model.learn(total_timesteps=200000, callback=callback)
 
-    # Save the final model
+    # 저장 save
     model_save_path = os.path.join(model_base_dir, model_name)
     os.makedirs(model_base_dir, exist_ok=True)
     model.save(model_save_path)
     print(f"Model saved to {model_save_path}")
 
-# Testing function
 def test(env_id, df, model_base_dir="models", model_name="anytrading_dqn"):
     model_path = os.path.join(model_base_dir, model_name)
     env = gym.make(env_id, df=df, window_size=10, frame_bound=(10, 300), render_mode="human")
 
-    # Wrap the environment with VecMonitor for compatibility
     vec_env = make_vec_env(lambda: env, n_envs=1)
 
-    # Load the trained model
     model = DQN.load(model_path, env=vec_env)
 
-    # Test the model
     obs = vec_env.reset()
     total_reward = 0
     while True:
@@ -127,10 +115,9 @@ def test(env_id, df, model_base_dir="models", model_name="anytrading_dqn"):
             print(f"Total Reward: {total_reward}")
             break
 
-    # Render the entire trading performance
     env.unwrapped.render_all(title="Trading Performance")
 
 if __name__ == "__main__":
     env_id = "stocks-v0"
-    train(env_id, STOCKS_GOOGL)
+    # train(env_id, STOCKS_GOOGL)
     test(env_id, STOCKS_GOOGL)
